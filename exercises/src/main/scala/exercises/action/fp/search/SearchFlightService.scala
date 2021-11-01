@@ -10,7 +10,11 @@ import scala.concurrent.duration._
 // This represent the main API of Lambda Corp.
 // `search` is called whenever a user press the "Search" button on the website.
 trait SearchFlightService {
-  def search(from: Airport, to: Airport, date: LocalDate): IO[SearchResult]
+  def search(
+      from: Airport,
+      to: Airport,
+      date: LocalDate
+    ): IO[SearchResult]
 }
 
 object SearchFlightService {
@@ -23,10 +27,20 @@ object SearchFlightService {
   // (see `SearchResult` companion object).
   // Note: A example based test is defined in `SearchFlightServiceTest`.
   //       You can also defined tests for `SearchResult` in `SearchResultTest`
-  def fromTwoClients(client1: SearchFlightClient, client2: SearchFlightClient): SearchFlightService =
+  def fromTwoClients(
+      client1: SearchFlightClient,
+      client2: SearchFlightClient
+    ): SearchFlightService =
     new SearchFlightService {
-      def search(from: Airport, to: Airport, date: LocalDate): IO[SearchResult] =
-        ???
+      def search(
+          from: Airport,
+          to: Airport,
+          date: LocalDate
+        ): IO[SearchResult] =
+        for {
+          c1 <- client1.search(from, to, date)
+          c2 <- client2.search(from, to, date)
+        } yield SearchResult(c1 ++ c2)
 
     }
 
@@ -46,8 +60,23 @@ object SearchFlightService {
   // Note: We can assume `clients` to contain less than 100 elements.
   def fromClients(clients: List[SearchFlightClient]): SearchFlightService =
     new SearchFlightService {
-      def search(from: Airport, to: Airport, date: LocalDate): IO[SearchResult] =
-        ???
+      def search(
+          from: Airport,
+          to: Airport,
+          date: LocalDate
+        ): IO[SearchResult] = {
+        def searchByClient(client: SearchFlightClient): IO[List[Flight]] =
+          client
+            .search(from, to, date)
+            .handleErrorWith(e => IO.debug(s"Wild error appeared $e") *> IO(Nil))
+
+        // IO
+        //   .sequence(clients.map(searchByClient))
+        //   .map(x => SearchResult(x.flatten))
+        IO
+          .traverse(clients)(searchByClient)
+          .map(x => SearchResult(x.flatten))
+      }
     }
 
   // 5. Refactor `fromClients` using `sequence` or `traverse` from the `IO` companion object.

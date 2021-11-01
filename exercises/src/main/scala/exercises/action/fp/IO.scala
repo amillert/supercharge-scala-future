@@ -5,6 +5,7 @@ import scala.annotation.tailrec
 import scala.concurrent.duration.{ Duration, FiniteDuration }
 import scala.concurrent.{ Await, ExecutionContext, Future, Promise }
 import scala.util.{ Failure, Success, Try }
+import scala.collection.immutable
 
 trait IO[A] {
 
@@ -191,7 +192,15 @@ object IO {
   // If no error occurs, it returns the users in the same order:
   // List(User(1111, ...), User(2222, ...), User(3333, ...))
   def sequence[A](actions: List[IO[A]]): IO[List[A]] =
-    ???
+    actions
+      .foldLeft(IO(List.empty[A])) { (acc, io) =>
+        acc.flatMap(as => io.map(_ :: as))
+      // for {
+      //   res1 <- acc
+      //   res2 <- io
+      // } yield res2 :: res1
+      }
+      .map(_.reverse)
 
   // `traverse` is a shortcut for `map` followed by `sequence`, similar to how
   // `flatMap`  is a shortcut for `map` followed by `flatten`
